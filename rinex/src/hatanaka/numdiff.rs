@@ -48,7 +48,7 @@ impl<const M: usize> NumDiff<M> {
 
     /// Rotate internal buffer, take new sample into account.
     fn rotate_history(&mut self, data: i64) {
-        self.buf.copy_within(0..M - 2, 1);
+        self.buf.copy_within(0..M - 1, 1);
         self.buf[0] = data;
     }
 
@@ -152,5 +152,58 @@ mod test {
         assert_eq!(diff.compress(113483138205), -3150848442);
         assert_eq!(diff.compress(113469906136), 1575425367);
         assert_eq!(diff.compress(113457280090), 146);
+    }
+
+    #[test]
+    fn test_history_rotation_full_order() {
+        // Regression test for https://github.com/nav-solutions/rinex/issues/426
+        //
+        // `rotate_history` used to only shift `buf[0..M-2]`, so `buf[M-1]`
+        // (the oldest history slot) was frozen at its initial value forever
+        // and never took part in the running history. Decompression that
+        // reaches the maximal order `M` (as happens for the clock-offset
+        // field, which is decompressed with `NumDiff<5>` at order 5) then
+        // silently used a stale value instead of the correct one, causing
+        // decompression to diverge and eventually overflow further down
+        // the file.
+        //
+        // `compressed` below is the correct order-5 CRINEX encoding of
+        // `original`, computed independently of this crate. Decompressing
+        // it must reproduce `original` exactly, which requires every slot
+        // of the history buffer (including buf[M-1]) to stay up to date.
+        let original = [
+            126298057858_i64,
+            126282454570,
+            126267372371,
+            126252810509,
+            127814188268,
+            127800656941,
+            127787641437,
+            127775141621,
+            127762669477,
+        ];
+        let compressed = [
+            -15603288_i64,
+            521089,
+            -752,
+            1575420036,
+            -6301688027,
+            9452541607,
+            -6301698660,
+            1574937163,
+        ];
+
+        let mut diff = NumDiff::<5>::new(original[0], 5);
+
+        let mut recovered = vec![original[0]];
+        for value in compressed {
+            recovered.push(diff.decompress(value));
+        }
+
+        assert_eq!(
+            recovered, original,
+            "decompressed sequence diverged from the original: \
+             history rotation must keep every buffer slot (including buf[M-1]) up to date"
+        );
     }
 }
