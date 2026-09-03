@@ -26,7 +26,7 @@ pub use textdiff::TextDiff;
 use thiserror::Error as ErrorTrait;
 
 /// Hatanaka dedicated Errors
-#[derive(Debug, ErrorTrait)]
+#[derive(Debug, Clone, Copy, PartialEq, ErrorTrait)]
 pub enum Error {
     /// Buffer too small to accept incoming data
     #[error("buffer overflow")]
@@ -48,4 +48,11 @@ pub enum Error {
     ///   with previously formwared Header
     #[error("sv parsing error")]
     SVParsing,
+    /// Numerical (de)compression order is not supported by this kernel
+    #[error("unsupported compression order")]
+    CompressionOrder,
+    /// Numerical (de)compression ran out of the i64 range:
+    /// corrupt data, or inconsistent kernel state
+    #[error("numerical (de)compression overflow")]
+    NumericOverflow,
 }

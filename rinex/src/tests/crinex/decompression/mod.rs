@@ -97,11 +97,12 @@ use crate::{
     observation::EpochFlag,
     prelude::{Epoch, GeodeticMarker, MarkerType, Rinex, SV},
     tests::toolkit::{
-        generic_observation_rinex_test, random_name, ClockDataPoint, SignalDataPoint, TimeFrame,
+        generic_observation_comparison, generic_observation_rinex_test, random_name,
+        ClockDataPoint, SignalDataPoint, TimeFrame,
     },
 };
 
-use std::{fs::remove_file as fs_remove_file, path::Path};
+use std::{fs::remove_file as fs_remove_file, io::BufReader, path::Path};
 
 #[test]
 fn testbench_v1() {
@@ -404,6 +405,7 @@ fn run_clock_offsets_test(
     crnx_path: &str,
     rnx_path: &str,
     expected_epochs: usize,
+    compare_signals: bool,
     points: &[(&str, f64)],
 ) {
     let crnx_path = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -418,6 +420,11 @@ fn run_clock_offsets_test(
 
     let dut = Rinex::from_file(crnx_path.to_string_lossy().as_ref()).unwrap();
     let model = Rinex::from_file(rnx_path.to_string_lossy().as_ref()).unwrap();
+
+    if compare_signals {
+        // strict point by point comparison of every signal (and clock)
+        generic_observation_comparison(&dut, &model);
+    }
 
     let dut_epochs = dut.epoch_iter().count();
     assert_eq!(dut_epochs, expected_epochs, "wrong number of epochs");
@@ -463,6 +470,7 @@ fn v3_acrg00gha_clock_offsets() {
         "CRNX/V3/ACRG00GHA_R_20240010000_30M_30S_MO.crx",
         "OBS/V3/ACRG00GHA_R_20240010000_30M_30S_MO.rnx",
         60,
+        true, // signals strictly compared with the CRX2RNX model
         &[
             // kernel reset: 3&1520
             ("2024-01-01T00:00:00 GPST", 0.000000001520),
@@ -548,6 +556,7 @@ fn v1_delf0010_clock_offsets() {
         "CRNX/V1/delf0010_clock.21d",
         "OBS/V2/delf0010_clock.21o",
         24,
+        false, // V1 observation decompression is not there yet (see testbench_v1)
         &[
             // kernel reset: 3&-123456
             ("2021-01-01T00:00:00 GPST", -0.000123456),
@@ -561,6 +570,34 @@ fn v1_delf0010_clock_offsets() {
             ("2021-01-01T00:09:00 GPST", 0.000001131),
         ],
     );
+}
+
+/// gh-426: a numerical state that no longer fits in an i64 must end the
+/// parsing with what was recovered so far, not panic (debug) nor wrap
+/// silently (release). The first kernel reset of the ACRG00GHA extract is
+/// replaced by i64::MAX, so the very next compressed value overflows.
+#[test]
+fn v3_clock_overflow_does_not_panic() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("test_resources")
+        .join("CRNX")
+        .join("V3")
+        .join("ACRG00GHA_R_20240010000_30M_30S_MO.crx");
+
+    let content = std::fs::read_to_string(path).unwrap();
+    assert_eq!(content.matches("3&1520\n").count(), 1);
+    let corrupted = content.replace("3&1520\n", "3&9223372036854775807\n");
+
+    let mut reader = BufReader::new(corrupted.as_bytes());
+    let rinex = Rinex::parse(&mut reader).unwrap();
+
+    // parsing stops at the corrupted epoch: at most the epoch carrying
+    // the reset itself is recovered, nothing past it
+    assert!(rinex.epoch_iter().count() <= 1);
+    for (_, clock) in rinex.clock_observations_iter() {
+        assert_eq!(clock.offset_s, i64::MAX as f64 / 1.0E12);
+    }
 }
 
 #[test]

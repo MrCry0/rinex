@@ -497,7 +497,7 @@ impl<const M: usize> DecompressorExpert<M> {
             }
         } else if !line.is_empty() {
             match line.parse::<i64>() {
-                Ok(val) => Some(self.clock_diff.decompress(val)),
+                Ok(val) => Some(self.clock_diff.decompress(val)?),
                 Err(_) => None,
             }
         } else {
@@ -627,7 +627,7 @@ impl<const M: usize> DecompressorExpert<M> {
                         // compressed data case
                         if let Ok(value) = slice.parse::<i64>() {
                             if let Some(kernel) = self.obs_diff.get_mut(&(self.sv, ptr)) {
-                                let value = kernel.decompress(value);
+                                let value = kernel.decompress(value)?;
                                 let value = value as f64 / 1000.0;
                                 formatted = format!("{:14.3}  ", value).to_string();
                             }
@@ -647,7 +647,7 @@ impl<const M: usize> DecompressorExpert<M> {
 
                         if let Ok(value) = slice.parse::<i64>() {
                             if let Some(kernel) = self.obs_diff.get_mut(&(self.sv, ptr)) {
-                                let value = kernel.decompress(value);
+                                let value = kernel.decompress(value)?;
                                 let value = value as f64 / 1000.0;
                                 formatted = format!("{:14.3}  ", value).to_string();
                             }
@@ -719,7 +719,7 @@ impl<const M: usize> DecompressorExpert<M> {
                         // compressed data case
                         if let Ok(value) = slice.parse::<i64>() {
                             if let Some(kernel) = self.obs_diff.get_mut(&(self.sv, ptr)) {
-                                let value = kernel.decompress(value);
+                                let value = kernel.decompress(value)?;
                                 let value = value as f64 / 1000.0;
                                 formatted = format!("{:14.3}  ", value).to_string();
                             }
