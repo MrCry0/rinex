@@ -460,16 +460,18 @@ fn run_clock_offsets_test(
 }
 
 /// Regression test for <https://github.com/nav-solutions/rinex/issues/426>.
-/// 30' of the BKG ACRG00GHA_R_20240010000_01D_30S_MO file reduced to a single SV,
+/// One hour of the BKG ACRG00GHA_R_20240010000_01D_30S_MO file reduced to a single SV,
 /// compressed with RNX2CRX 4.1.0. The receiver clock offset is reset ("3&") at
-/// order 3, then compressed, omitted for a few epochs, then reset twice more.
+/// order 3, then compressed, omitted for a few epochs, then reset five more times.
+/// On the released kernel this sequence overflows at epoch 91: the test exercises
+/// both symptoms of the issue, the panic and the silently missing clock offsets.
 /// The model is the CRX2RNX 4.1.0 output.
 #[test]
 fn v3_acrg00gha_clock_offsets() {
     run_clock_offsets_test(
-        "CRNX/V3/ACRG00GHA_R_20240010000_30M_30S_MO.crx",
-        "OBS/V3/ACRG00GHA_R_20240010000_30M_30S_MO.rnx",
-        60,
+        "CRNX/V3/ACRG00GHA_R_20240010000_01H_30S_MO.crx",
+        "OBS/V3/ACRG00GHA_R_20240010000_01H_30S_MO.rnx",
+        120,
         true, // signals strictly compared with the CRX2RNX model
         &[
             // kernel reset: 3&1520
@@ -490,7 +492,7 @@ fn v3_acrg00gha_clock_offsets() {
         .join("test_resources")
         .join("CRNX")
         .join("V3")
-        .join("ACRG00GHA_R_20240010000_30M_30S_MO.crx");
+        .join("ACRG00GHA_R_20240010000_01H_30S_MO.crx");
 
     let dut = Rinex::from_file(path.to_string_lossy().as_ref()).unwrap();
 
@@ -507,7 +509,7 @@ fn v3_acrg00gha_clock_offsets() {
         None, // ground_ref_wgs84_m
         None, // observer
         None, // geodetic_marker
-        TimeFrame::from_inclusive_csv("2024-01-01T00:00:00 GPST, 2024-01-01T00:29:30 GPST, 30 s"),
+        TimeFrame::from_inclusive_csv("2024-01-01T00:00:00 GPST, 2024-01-01T00:59:30 GPST, 30 s"),
         vec![], // signals
         vec![
             // kernel reset: 3&1520
@@ -583,7 +585,7 @@ fn v3_clock_overflow_does_not_panic() {
         .join("test_resources")
         .join("CRNX")
         .join("V3")
-        .join("ACRG00GHA_R_20240010000_30M_30S_MO.crx");
+        .join("ACRG00GHA_R_20240010000_01H_30S_MO.crx");
 
     let content = std::fs::read_to_string(path).unwrap();
     assert_eq!(content.matches("3&1520\n").count(), 1);
