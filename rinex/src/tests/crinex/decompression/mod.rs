@@ -96,7 +96,9 @@ pub fn run_raw_decompression_test(
 use crate::{
     observation::EpochFlag,
     prelude::{Epoch, GeodeticMarker, MarkerType, Rinex, SV},
-    tests::toolkit::{generic_observation_rinex_test, random_name, SignalDataPoint, TimeFrame},
+    tests::toolkit::{
+        generic_observation_rinex_test, random_name, ClockDataPoint, SignalDataPoint, TimeFrame,
+    },
 };
 
 use std::{fs::remove_file as fs_remove_file, path::Path};
@@ -393,6 +395,172 @@ fn testbench_v3() {
         // TODO unlock this
         // generic_observation_rinex_against_model();
     }
+}
+
+/// Compares every receiver clock offset decompressed from `crnx_path`
+/// against the RINEX model at `rnx_path` (produced by the historical CRX2RNX tool),
+/// then verifies a few hand-picked `points` (epoch, offset in seconds).
+fn run_clock_offsets_test(
+    crnx_path: &str,
+    rnx_path: &str,
+    expected_epochs: usize,
+    points: &[(&str, f64)],
+) {
+    let crnx_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("test_resources")
+        .join(crnx_path);
+
+    let rnx_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("test_resources")
+        .join(rnx_path);
+
+    let dut = Rinex::from_file(crnx_path.to_string_lossy().as_ref()).unwrap();
+    let model = Rinex::from_file(rnx_path.to_string_lossy().as_ref()).unwrap();
+
+    let dut_epochs = dut.epoch_iter().count();
+    assert_eq!(dut_epochs, expected_epochs, "wrong number of epochs");
+    assert_eq!(dut_epochs, model.epoch_iter().count());
+
+    let dut_clocks = dut.clock_observations_iter().collect::<Vec<_>>();
+    let model_clocks = model.clock_observations_iter().collect::<Vec<_>>();
+
+    assert!(!model_clocks.is_empty(), "model has no clock offsets");
+    assert_eq!(
+        dut_clocks.len(),
+        model_clocks.len(),
+        "wrong number of clock offsets"
+    );
+
+    for ((dut_k, dut_clock), (model_k, model_clock)) in dut_clocks.iter().zip(model_clocks.iter()) {
+        assert_eq!(dut_k, model_k, "clock offset attached to wrong epoch");
+        assert_eq!(
+            dut_clock.offset_s, model_clock.offset_s,
+            "wrong clock offset at {}",
+            dut_k.epoch
+        );
+    }
+
+    for (epoch, offset_s) in points {
+        let epoch = Epoch::from_str(epoch).unwrap();
+        let (_, clock) = dut_clocks
+            .iter()
+            .find(|(k, _)| k.epoch == epoch)
+            .unwrap_or_else(|| panic!("missing clock offset at {}", epoch));
+        assert_eq!(clock.offset_s, *offset_s, "wrong clock offset at {}", epoch);
+    }
+}
+
+/// Regression test for <https://github.com/nav-solutions/rinex/issues/426>.
+/// 30' of the BKG ACRG00GHA_R_20240010000_01D_30S_MO file reduced to a single SV,
+/// compressed with RNX2CRX 4.1.0. The receiver clock offset is reset ("3&") at
+/// order 3, then compressed, omitted for a few epochs, then reset twice more.
+/// The model is the CRX2RNX 4.1.0 output.
+#[test]
+fn v3_acrg00gha_clock_offsets() {
+    run_clock_offsets_test(
+        "CRNX/V3/ACRG00GHA_R_20240010000_30M_30S_MO.crx",
+        "OBS/V3/ACRG00GHA_R_20240010000_30M_30S_MO.rnx",
+        60,
+        &[
+            // kernel reset: 3&1520
+            ("2024-01-01T00:00:00 GPST", 0.000000001520),
+            // first compressed value (order 1)
+            ("2024-01-01T00:00:30 GPST", 0.000000003404),
+            // steady state (order 3)
+            ("2024-01-01T00:05:00 GPST", 0.000000001788),
+            // last value before the clock is omitted
+            ("2024-01-01T00:15:00 GPST", 0.000000000204),
+            // kernel reset after the gap: 3&-1459
+            ("2024-01-01T00:20:00 GPST", -0.000000001459),
+        ],
+    );
+
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("test_resources")
+        .join("CRNX")
+        .join("V3")
+        .join("ACRG00GHA_R_20240010000_30M_30S_MO.crx");
+
+    let dut = Rinex::from_file(path.to_string_lossy().as_ref()).unwrap();
+
+    generic_observation_rinex_test(
+        &dut,
+        "3.05",
+        Some("MIXED"),
+        true, // has_clock
+        "I02",
+        "IRNSS",
+        &[("IRNSS", "C5A, D5A, L5A, S5A")],
+        Some("2024-01-01T00:00:00 GPST"),
+        None,
+        None, // ground_ref_wgs84_m
+        None, // observer
+        None, // geodetic_marker
+        TimeFrame::from_inclusive_csv("2024-01-01T00:00:00 GPST, 2024-01-01T00:29:30 GPST, 30 s"),
+        vec![], // signals
+        vec![
+            // kernel reset: 3&1520
+            ClockDataPoint::new(
+                Epoch::from_str("2024-01-01T00:00:00 GPST").unwrap(),
+                EpochFlag::Ok,
+                0.000000001520,
+            ),
+            // first compressed value (order 1)
+            ClockDataPoint::new(
+                Epoch::from_str("2024-01-01T00:00:30 GPST").unwrap(),
+                EpochFlag::Ok,
+                0.000000003404,
+            ),
+            // steady state (order 3)
+            ClockDataPoint::new(
+                Epoch::from_str("2024-01-01T00:05:00 GPST").unwrap(),
+                EpochFlag::Ok,
+                0.000000001788,
+            ),
+            // last value before the clock is omitted
+            ClockDataPoint::new(
+                Epoch::from_str("2024-01-01T00:15:00 GPST").unwrap(),
+                EpochFlag::Ok,
+                0.000000000204,
+            ),
+            // kernel reset after the gap: 3&-1459
+            ClockDataPoint::new(
+                Epoch::from_str("2024-01-01T00:20:00 GPST").unwrap(),
+                EpochFlag::Ok,
+                -0.000000001459,
+            ),
+        ],
+    );
+}
+
+/// RINEX 2.11 counterpart of the previous test: a delf0010.21o extract with
+/// receiver clock offsets (F12.9, columns 69-80), compressed with RNX2CRX 4.1.0.
+/// Includes a gap in the clock reports and a clock jump. The model is the
+/// CRX2RNX 4.1.0 output.
+/// Only the clock offsets are verified here: V1 observation decompression
+/// is covered (and currently failing) in `testbench_v1`.
+#[test]
+fn v1_delf0010_clock_offsets() {
+    run_clock_offsets_test(
+        "CRNX/V1/delf0010_clock.21d",
+        "OBS/V2/delf0010_clock.21o",
+        24,
+        &[
+            // kernel reset: 3&-123456
+            ("2021-01-01T00:00:00 GPST", -0.000123456),
+            // 2-character compressed value: "36"
+            ("2021-01-01T00:00:30 GPST", -0.000123420),
+            // last value before the gap
+            ("2021-01-01T00:04:30 GPST", -0.000123204),
+            // kernel reset after the gap
+            ("2021-01-01T00:07:00 GPST", -0.000123134),
+            // clock jump
+            ("2021-01-01T00:09:00 GPST", 0.000001131),
+        ],
+    );
 }
 
 #[test]
