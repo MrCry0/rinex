@@ -78,7 +78,7 @@ serde = { version = "1.0", default-features = false, features = ["derive"] }
 
 maud = { version = "0.26", optional = true }
 plotly = { version = "0.12", optional = true }
-anise = { version = "0.5.2", features = ["embed_ephem"], optional = true }
+anise = { version = "0.6", features = ["embed_ephem"], optional = true }
 
 gnss-rtk = { version = "=0.8.0", features = ["serde"], optional = true }
 
