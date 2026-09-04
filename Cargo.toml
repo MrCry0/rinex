@@ -8,7 +8,6 @@ members = [
     "qc-traits", 
     "rinex", 
     "rinex-qc", 
-    "rinex-cli", 
     "rnx2bin", 
     "rnx2crx", 
     "sp3",
@@ -16,8 +15,11 @@ members = [
     "ublox-rnx", 
 ]
 
+# rinex-cli declares positioning modules that are not part of this tree
+# and cannot build here: the CLI lives in nav-solutions/rinex-cli.
 exclude = [
     "./test_resources",
+    "./rinex-cli",
 ]
 
 [profile.release]
