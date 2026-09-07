@@ -7,6 +7,7 @@ use crate::{
 use std::{
     collections::HashMap,
     fs::read_to_string,
+    io::BufReader,
     str::{from_utf8, FromStr},
 };
 
@@ -246,4 +247,27 @@ fn v3_acrg00gha_clock_offsets() {
             })
             .collect(),
     );
+}
+
+/// gh-426: a numerical state that no longer fits in an i64 must end the
+/// parsing with what was recovered so far, not panic (debug) nor wrap
+/// silently (release). The first kernel reset of the ACRG00GHA extract is
+/// replaced by i64::MAX, so the very next compressed value overflows.
+#[test]
+fn v3_clock_overflow_does_not_panic() {
+    let content = read_to_string("data/CRNX/V3/ACRG00GHA_R_20240010000_01H_30S_MO.crx").unwrap();
+
+    assert_eq!(content.matches("3&1520\n").count(), 1);
+    let corrupted = content.replace("3&1520\n", "3&9223372036854775807\n");
+
+    let mut reader = BufReader::new(corrupted.as_bytes());
+
+    // parsing stops at the corrupted epoch: at most the epoch carrying
+    // the reset itself is recovered, nothing past it
+    if let Ok(rinex) = Rinex::parse(&mut reader) {
+        assert!(rinex.epoch_iter().count() <= 1);
+        for (_, clock) in rinex.clock_observations_iter() {
+            assert_eq!(clock.offset_s, i64::MAX as f64 / 1.0E12);
+        }
+    }
 }

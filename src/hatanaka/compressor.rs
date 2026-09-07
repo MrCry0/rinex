@@ -144,7 +144,7 @@ impl<const M: usize> CompressorExpert<M> {
                     let scaling = if self.v3 { 1.0E12 } else { 1.0E9 };
                     let value = (clock.offset_s * scaling).round() as i64;
                     match &mut self.clock_diff {
-                        Some(kernel) => writeln!(w, "{}", kernel.compress(value))?,
+                        Some(kernel) => writeln!(w, "{}", kernel.compress(value)?)?,
                         None => {
                             writeln!(w, "3&{}", value)?;
                             self.clock_diff = Some(NumDiff::<M>::new(value, 3));
@@ -200,7 +200,7 @@ impl<const M: usize> CompressorExpert<M> {
                             .filter(|((sv, obs), _)| *sv == signal.sv && obs == &signal.observable)
                             .reduce(|k, _| k)
                         {
-                            let compressed = sv_kernel.compress(quantized);
+                            let compressed = sv_kernel.compress(quantized)?;
                             write!(w, "{} ", compressed)?;
                         } else {
                             // first encounter: build kernel
