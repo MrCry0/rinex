@@ -407,7 +407,9 @@ impl<const M: usize> DecompressorExpert<M> {
 
         // provide clock data, if any
         if let Some(clock_data) = clock_data {
-            let value = clock_data as f64 / 1000.0;
+            // RINEX 3 formats the clock offset as F15.12: the CRINEX
+            // integer is the offset with the decimal point removed.
+            let value = clock_data as f64 / 1.0E12;
             let formatted = format!("       {:.12}", value);
             let fmt_len = formatted.len(); // TODO improve: this is constant
             let bytes = formatted.as_bytes();
@@ -433,7 +435,10 @@ impl<const M: usize> DecompressorExpert<M> {
 
         // push clock offset (if any)
         if let Some(clock_data) = clock_data {
-            let formatted_ck = format!(" {:15.12}", clock_data);
+            // RINEX 2 formats the clock offset as F12.9: the CRINEX
+            // integer is the offset with the decimal point removed.
+            let value = clock_data as f64 / 1.0E9;
+            let formatted_ck = format!(" {:12.9}", value);
             let fmt_len = formatted_ck.len(); // TODO: improve (constant)
             let formatted_ck = formatted_ck.as_bytes();
             buf[produced..produced + fmt_len].copy_from_slice(&formatted_ck);
