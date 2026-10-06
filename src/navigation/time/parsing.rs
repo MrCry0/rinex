@@ -31,6 +31,8 @@ impl TimeOffset {
             // NavIC: GPST aligned
             "IRUT" => Ok((TimeScale::GPST, TimeScale::UTC)),
             "IRGP" => Ok((TimeScale::GPST, TimeScale::GPST)),
+            "IRGA" => Ok((TimeScale::GPST, TimeScale::GST)),
+            "IRGL" => Ok((TimeScale::GPST, TimeScale::UTC)),
             // beidou / glonass
             "BDGL" => Ok((TimeScale::BDT, TimeScale::UTC)),
             _ => Err(ParsingError::NavInvalidTimescale),
@@ -291,6 +293,24 @@ mod test {
                 TimeScale::UTC,
             ),
             (
+                "IRGA  1.0564690456E-08 1.021405183E-14  85200 2362          TIME SYSTEM CORR\n",
+                1.0564690456e-08,
+                1.021405183e-14,
+                2362,
+                85200,
+                TimeScale::GPST,
+                TimeScale::GST,
+            ),
+            (
+                "IRGL  1.1379597709E-08 6.661338148E-15  85200 2362          TIME SYSTEM CORR\n",
+                1.1379597709e-08,
+                6.661338148e-15,
+                2362,
+                85200,
+                TimeScale::GPST,
+                TimeScale::UTC,
+            ),
+            (
                 "QZUT  5.5879354477E-09 0.000000000E+00  94208 2139          TIME SYSTEM CORR\n",
                 5.5879354477e-09,
                 0.000000000e+00,
@@ -415,6 +435,18 @@ mod test {
                 "IRGP",
                 TimeScale::GPST,
                 TimeScale::GPST,
+            ),
+            (
+                "    2023 06 24 00 00 00 IRGA",
+                "IRGA",
+                TimeScale::GPST,
+                TimeScale::GST,
+            ),
+            (
+                "    2023 06 24 00 00 00 IRGL",
+                "IRGL",
+                TimeScale::GPST,
+                TimeScale::UTC,
             ),
             (
                 "    2021 07 05 23 20 00 BDGL",
