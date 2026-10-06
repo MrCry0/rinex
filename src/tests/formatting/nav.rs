@@ -343,7 +343,23 @@ fn nav_v3_written_as_v4_gets_message_types() {
     let mut parsed = parsed;
     parsed.header.version = Version::new(3, 5);
     let back = write_and_reparse(&parsed, "v4-back-as-v3").unwrap();
-    assert_eq!(back.record.as_nav().unwrap(), &original);
+    // spare fields hold no information and the RINEX 4 definitions have
+    // fewer of them, so only the other fields survive the round trip
+    assert_eq!(
+        without_spares(back.record.as_nav().unwrap()),
+        without_spares(&original)
+    );
+}
+
+/// The record without the `spareN` orbit entries of its ephemerides.
+fn without_spares(record: &crate::navigation::Record) -> crate::navigation::Record {
+    let mut record = record.clone();
+    for frame in record.values_mut() {
+        if let crate::navigation::NavFrame::EPH(eph) = frame {
+            eph.orbits.retain(|name, _| !name.starts_with("spare"));
+        }
+    }
+    record
 }
 
 /// A mixed RINEX 3 file written as a RINEX 2 GPS file keeps the GPS
@@ -395,4 +411,42 @@ fn nav_nothing_representable_is_an_error() {
         "{:?}",
         result.map(|_| ())
     );
+}
+
+/// A zero-valued orbit field is a value, not an omitted field: it must be
+/// written as zero. Fields were once dropped when parsed as `0.0`, and the
+/// writer then left blanks where the source had zeros, which readers that
+/// count fields on a line cannot parse.
+#[test]
+fn nav_v3_zero_valued_orbit_fields_are_written() {
+    use std::io::{BufReader, Cursor};
+
+    // a raw string keeps the leading blanks, unlike a `\` line continuation
+    let content = r"     3.04           NAVIGATION DATA     M                   RINEX VERSION / TYPE
+BCEmerge            congo               20250414 005004 GMT PGM / RUN BY / DATE 
+                                                            END OF HEADER
+G01 2025 04 13 00 00 00 2.191821113229e-04 1.637090463191e-11 0.000000000000e+00
+     1.880000000000e+02-9.512500000000e+01 4.521974072657e-09-9.593786393655e-01
+    -5.010515451431e-06 4.736941773444e-04 9.292736649513e-06 5.153728631973e+03
+     0.000000000000e+00 3.725290298462e-09 2.622478069104e+00 2.607703208923e-08
+     9.597690556279e-01 1.995937500000e+02 8.346958957487e-02-8.041406385425e-09
+    -2.175090601254e-10 1.000000000000e+00 2.362000000000e+03 0.000000000000e+00
+     2.000000000000e+00 0.000000000000e+00-9.313225746155e-09 4.440000000000e+02
+    -7.182000000000e+03 4.000000000000e+00
+";
+    let rinex = Rinex::parse(&mut BufReader::new(Cursor::new(content.as_bytes()))).unwrap();
+
+    let tmp = format!("test-zero-orbit-{}.rnx", std::process::id());
+    rinex.to_file(&tmp).unwrap();
+    let written = read_to_string(&tmp).unwrap();
+    let _ = remove_file(&tmp);
+
+    let body = |text: &str| -> Vec<String> {
+        text.lines()
+            .skip_while(|line| !line.contains("END OF HEADER"))
+            .skip(1)
+            .map(|line| line.trim_end().replace('e', "E"))
+            .collect()
+    };
+    assert_eq!(body(&written), body(content));
 }

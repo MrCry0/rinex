@@ -142,16 +142,6 @@ impl OrbitItem {
         // make it "rust" compatible
         let float = parse_f64(val_str).map_err(|_| ParsingError::NavNullOrbit)?;
 
-        // do not tolerate zero values for native types
-        match type_str {
-            "u8" | "i8" | "u32" | "f64" => {
-                if float == 0.0 {
-                    return Err(ParsingError::NavNullOrbit);
-                }
-            },
-            _ => {}, // non-native types
-        }
-
         // uninterpreted data remains as native type and we exit.
         match type_str {
             "u8" => {

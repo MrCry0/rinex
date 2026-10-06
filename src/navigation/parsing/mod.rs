@@ -183,7 +183,7 @@ mod test {
         assert_eq!(ephemeris.clock_drift_rate, 7.38E4);
 
         let orbits = &ephemeris.orbits;
-        assert_eq!(orbits.len(), 10);
+        assert_eq!(orbits.len(), 12);
 
         for (k, v) in orbits.iter() {
             if k.eq("satPosX") {
@@ -248,7 +248,7 @@ mod test {
         assert_eq!(ephemeris.clock_drift_rate, 0.0);
 
         let orbits = &ephemeris.orbits;
-        assert_eq!(orbits.len(), 23);
+        assert_eq!(orbits.len(), 28);
 
         for (k, v) in orbits.iter() {
             if k.eq("aode") {
@@ -301,6 +301,14 @@ mod test {
                 assert_eq!(v.as_f64(), 0.432000000000e+06);
             } else if k.eq("aodc") {
                 assert_eq!(v.as_f64(), 0.000000000000e+00);
+            } else if k.eq("spare4") {
+                assert_eq!(v.as_f64(), 0.0);
+            } else if k.eq("spare2") {
+                assert_eq!(v.as_f64(), 0.0);
+            } else if k.eq("spare1") {
+                assert_eq!(v.as_f64(), 0.0);
+            } else if k.eq("spare3") {
+                assert_eq!(v.as_f64(), 0.0);
             } else {
                 panic!("Got unexpected key \"{}\" for BDSV3 record", k);
             }
@@ -339,7 +347,7 @@ mod test {
         assert_eq!(ephemeris.clock_drift_rate, 0.0);
 
         let orbits = &ephemeris.orbits;
-        assert_eq!(orbits.len(), 23);
+        assert_eq!(orbits.len(), 28);
 
         for (k, v) in orbits.iter() {
             if k.eq("iodnav") {
@@ -391,6 +399,14 @@ mod test {
                 assert_eq!(v.as_f64(), 0.000000000000e+00);
             } else if k.eq("t_tm") {
                 assert_eq!(v.as_f64(), 0.469330000000e+06);
+            } else if k.eq("spare2") {
+                assert_eq!(v.as_f64(), 0.0);
+            } else if k.eq("spare4") {
+                assert_eq!(v.as_f64(), 0.0);
+            } else if k.eq("spare3") {
+                assert_eq!(v.as_f64(), 0.0);
+            } else if k.eq("spare1") {
+                assert_eq!(v.as_f64(), 0.0);
             } else {
                 panic!("Got unexpected key \"{}\" for GALV3 record", k);
             }
@@ -426,7 +442,7 @@ mod test {
         assert_eq!(ephemeris.clock_drift_rate, 0.342000000000e+05);
 
         let orbits = &ephemeris.orbits;
-        assert_eq!(orbits.len(), 9);
+        assert_eq!(orbits.len(), 12);
 
         for (k, v) in orbits.iter() {
             if k.eq("satPosX") {
