@@ -147,16 +147,15 @@ impl TimeOffset {
         let t_ref = parse_epoch_in_timescale(epoch.trim(), lhs)?;
         let (t_week, t_nanos) = t_ref.to_time_of_week();
 
-        let (_, rem) = line_2.split_at(23);
+        let (t_tm, rem) = line_2.split_at(23);
         let (a0, rem) = rem.split_at(19);
         let (a1, rem) = rem.split_at(19);
         let (a2, _) = rem.split_at(19);
 
-        // let t_tm = t_tm
-        //     .trim()
-        //     .replace('D', "e")
-        //     .parse::<f64>()
-        //     .map_err(|_| ParsingError::NavTimeOffsetParinsg)?;
+        let t_tm = match t_tm.trim() {
+            "" => None,
+            t_tm => Some(parse_f64(t_tm).map_err(|_| ParsingError::NavTimeOffsetParinsg)?),
+        };
 
         let (a0, a1, a2) = (
             parse_f64(a0.trim()).map_err(|_| ParsingError::NavTimeOffsetParinsg)?,
@@ -167,6 +166,7 @@ impl TimeOffset {
         let mut time_offset = Self::from_time_of_week(t_week, t_nanos, lhs, rhs, (a0, a1, a2));
         time_offset.utc = utc;
         time_offset.time_system = Some(timescales.to_string());
+        time_offset.t_tm = t_tm;
 
         Ok(time_offset)
     }
@@ -375,7 +375,8 @@ mod test {
                 if index == 0 {
                     // assert_eq!(line, line_1);
                 } else if index == 1 {
-                    // assert_eq!(line, line_2);
+                    // the message transmission time is written back as read
+                    assert_eq!(line, line_2);
                 } else if index == 3 {
                     panic!("two lines expected (only)!");
                 }

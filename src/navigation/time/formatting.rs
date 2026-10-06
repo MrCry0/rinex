@@ -106,8 +106,8 @@ impl TimeOffset {
     }
 
     /// Formats the RINEX 4 STO record (Table A33), following the
-    /// "> STO" record header. The message transmission time is not
-    /// stored: the reference time (seconds of week) is written in its slot.
+    /// "> STO" record header. The message transmission time is written
+    /// when known, the reference time (seconds of week) otherwise.
     pub(crate) fn format_v4<W: Write>(&self, w: &mut BufWriter<W>) -> Result<(), FormattingError> {
         let t = Epoch::from_time_of_week(self.t_ref.0, self.t_ref.1, self.lhs);
 
@@ -130,7 +130,7 @@ impl TimeOffset {
         writeln!(
             w,
             "    {}{}{}{}",
-            NavFormatter::new((self.t_ref.1 / 1_000_000_000) as f64),
+            NavFormatter::new(self.t_tm.unwrap_or((self.t_ref.1 / 1_000_000_000) as f64)),
             NavFormatter::new(self.polynomial.0),
             NavFormatter::new(self.polynomial.1),
             NavFormatter::new(self.polynomial.2),

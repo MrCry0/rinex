@@ -80,22 +80,16 @@ fn v4_records_write_back(name: &str) {
             .get(key)
             .unwrap_or_else(|| panic!("written record not in the original file:\n{}", key));
 
-        let (block, written) = if key.starts_with("> STO") {
-            // the message transmission time is not stored: the first
-            // field of the second line is not compared
-            (
-                vec![block[0].clone(), block[1][23..].to_string()],
-                vec![written[0].clone(), written[1][23..].to_string()],
-            )
-        } else if key.starts_with("> ION") && block.len() == 3 && block[2].len() == 23 {
-            // Klobuchar: a blank region code is read as worldwide (0)
-            // and written as such
-            let mut block = block.clone();
-            block[2].push_str(" 0.000000000000E+00");
-            (block, written.clone())
-        } else {
-            (block.clone(), written.clone())
-        };
+        let (block, written) =
+            if key.starts_with("> ION") && block.len() == 3 && block[2].len() == 23 {
+                // Klobuchar: a blank region code is read as worldwide (0)
+                // and written as such
+                let mut block = block.clone();
+                block[2].push_str(" 0.000000000000E+00");
+                (block, written.clone())
+            } else {
+                (block.clone(), written.clone())
+            };
 
         assert_eq!(written, block, "record differs:\n{}", key);
         compared += 1;
