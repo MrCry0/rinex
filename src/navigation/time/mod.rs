@@ -34,6 +34,10 @@ pub struct TimeOffset {
     /// (GLONASS and NavIC times) keep their identity here.
     pub time_system: Option<String>,
 
+    /// Message transmission time, in seconds of week, when known (RINEX 4
+    /// records carry it, other revisions do not).
+    pub t_tm: Option<f64>,
+
     /// Interpolation polynomial
     pub polynomial: (f64, f64, f64),
 }
@@ -53,6 +57,7 @@ impl TimeOffset {
             t_ref,
             utc: None,
             time_system: None,
+            t_tm: None,
             polynomial,
         }
     }
@@ -70,6 +75,7 @@ impl TimeOffset {
             rhs,
             utc: None,
             time_system: None,
+            t_tm: None,
             polynomial,
             t_ref: (t_week, t_nanos),
         }
