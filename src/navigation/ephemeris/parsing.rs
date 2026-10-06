@@ -607,6 +607,72 @@ mod test {
     }
 
     #[test]
+    fn galileo_v4_sisa_row() {
+        // RINEX 4 Galileo: GAL Week # is followed by a spare, then the
+        // SISA row (SISA, health, BGD E5a/E1, BGD E5b/E1) and the
+        // transmission time row. The SISA is a value, not a flag.
+        for (msgtype, content, source, bgd_e5b) in [
+            (
+                NavMessageType::INAV,
+                "E02 2026 10 01 00 00 00 7.271056529135e-05 2.614797267597e-12 0.000000000000e+00
+     6.800000000000e+01 7.834375000000e+01 3.045126841756e-09 7.015112779034e-02
+     3.671273589134e-06 3.689213190228e-04 1.198053359985e-05 5.440629188538e+03
+     3.456000000000e+05-3.352761268616e-08-2.564799308335e+00 3.539025783539e-08
+     9.614782852241e-01 8.450000000000e+01 2.687613466689e-01-5.342722545839e-09
+    -3.110843864848e-10 5.160000000000e+02 2.438000000000e+03                   
+     3.120000000000e+00 0.000000000000e+00-2.328306436539e-09-3.492459654808e-09
+     3.462640000000e+05",
+                516.0,
+                Some(-3.492459654808e-09),
+            ),
+            (
+                NavMessageType::FNAV,
+                "E02 2026 10 01 00 00 00 7.271085632965e-05 2.614797267597e-12 0.000000000000e+00
+     6.800000000000e+01 7.834375000000e+01 3.045126841756e-09 7.015112779034e-02
+     3.671273589134e-06 3.689213190228e-04 1.198053359985e-05 5.440629188538e+03
+     3.456000000000e+05-3.352761268616e-08-2.564799308335e+00 3.539025783539e-08
+     9.614782852241e-01 8.450000000000e+01 2.687613466689e-01-5.342722545839e-09
+    -3.110843864848e-10 2.580000000000e+02 2.438000000000e+03                   
+     3.120000000000e+00 0.000000000000e+00-2.328306436539e-09 0.000000000000e+00
+     3.463200000000e+05",
+                258.0,
+                None,
+            ),
+        ] {
+            let (_, sv, eph) =
+                Ephemeris::parse_v4(msgtype, content.lines(), TimeScale::GST).unwrap();
+            assert_eq!(sv, SV::from_str("E02").unwrap());
+            assert_eq!(eph.get_orbit_f64("source"), Some(source));
+            assert_eq!(eph.get_week(), Some(2438));
+            assert_eq!(eph.get_orbit_f64("sisa"), Some(3.12), "{:?}", msgtype);
+            assert_eq!(eph.get_orbit_f64("health"), Some(0.0), "{:?}", msgtype);
+            assert_eq!(
+                eph.get_orbit_f64("bgdE5aE1"),
+                Some(-2.328306436539e-09),
+                "{:?}",
+                msgtype
+            );
+            // a zero field is only a value once zero fields are kept
+            if let Some(bgd_e5b) = bgd_e5b {
+                assert_eq!(
+                    eph.get_orbit_f64("bgdE5bE1"),
+                    Some(bgd_e5b),
+                    "{:?}",
+                    msgtype
+                );
+            }
+            assert_eq!(
+                eph.get_orbit_f64("t_tm"),
+                Some(if msgtype == NavMessageType::INAV {
+                    3.462640000000e+05
+                } else {
+                    3.463200000000e+05
+                })
+            );
+        }
+    }
+
+    #[test]
     fn glonass_l1oc_v4() {
         // RINEX 4.02 Table A18
         let content =
