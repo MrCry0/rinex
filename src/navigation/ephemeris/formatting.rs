@@ -176,6 +176,33 @@ mod test {
     }
 
     #[test]
+    fn sbas_negative_transmission_time_is_written_as_read() {
+        // some SBAS records carry -88 in the transmission time slot
+        let content =
+            "S30 2026 08 02 00 00 00-8.856877684593E-07 0.000000000000E+00-8.800000000000E+01
+    -3.227082520000E+04 9.600000000000E-04-7.500000000000E-08 6.300000000000E+01
+     2.713120816000E+04-1.366875000000E-03-8.750000000000E-08 3.276700000000E+04
+     3.176844000000E+02-5.800000000000E-03-8.125000000000E-07 6.200000000000E+01";
+        let version = Version::from_str("3.04").unwrap();
+
+        let (_, sv, ephemeris) = Ephemeris::parse_v2v3(
+            version,
+            crate::prelude::Constellation::Mixed,
+            content.lines(),
+        )
+        .unwrap();
+
+        let mut writer = BufWriter::new(Utf8Buffer::new(1024));
+        ephemeris
+            .format(&mut writer, sv, version, NavMessageType::LNAV)
+            .unwrap();
+        let written = writer.into_inner().unwrap().to_ascii_utf8();
+
+        let third_field = &written[38..57];
+        assert_eq!(third_field, "-8.800000000000E+01");
+    }
+
+    #[test]
     fn sbas_ephemeris_formatting() {
         // SBAS: the transmission time (seconds of week) is written
         // in the clock drift rate slot

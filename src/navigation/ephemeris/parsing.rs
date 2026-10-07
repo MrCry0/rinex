@@ -10,6 +10,19 @@ use crate::{
 
 use std::{collections::HashMap, str::Lines};
 
+/// The SBAS "week" slot holds the message transmission time in seconds
+/// of week. Some files carry a negative placeholder (-88) when the time
+/// is unknown: a value that is not an unsigned integer is kept as read
+/// instead of being clamped to zero.
+fn sbas_transmission_time(value: f64) -> OrbitItem {
+    let rounded = value.round();
+    if (0.0..=u32::MAX as f64).contains(&rounded) {
+        OrbitItem::U32(rounded as u32)
+    } else {
+        OrbitItem::F64(value)
+    }
+}
+
 /// Parses all orbital elements.
 /// Descriptor is retrieved from database db/NAV/orbits.
 /// ## Inputs
@@ -148,10 +161,7 @@ impl Ephemeris {
         if sv.constellation.is_sbas() {
             // SBAS frames specificity:
             // clock drift rate does not exist and is actually the week counter
-            orbits.insert(
-                "week".to_string(),
-                OrbitItem::U32(clock_drift_rate.round() as u32),
-            );
+            orbits.insert("week".to_string(), sbas_transmission_time(clock_drift_rate));
 
             clock_drift_rate = 0.0_f64; // drift rate null: non existing
         }
@@ -200,10 +210,7 @@ impl Ephemeris {
         if sv.constellation.is_sbas() {
             // SBAS frames specificity:
             // clock drift rate does not exist and is actually the week counter
-            orbits.insert(
-                "week".to_string(),
-                OrbitItem::U32(clock_drift_rate.round() as u32),
-            );
+            orbits.insert("week".to_string(), sbas_transmission_time(clock_drift_rate));
             clock_drift_rate = 0.0_f64; // drift rate null: non existing
         }
 
